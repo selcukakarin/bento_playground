@@ -83,4 +83,20 @@ curl -X POST "http://localhost:4196/echo" ^
 
 - Bento Getting Started dokümantasyonu: `https://warpstreamlabs.github.io/bento/docs/guides/getting_started/`
 
+### Ek: Bloblang etkileşimli editör (blobl server)
+
+Bloblang, Bento'nun güçlü ve okunabilir eşleme (mapping) dilidir. Dokümanları deneme–yanılma ile rahatça dönüştürmek için Bento Docker imajı içindeki etkileşimli Bloblang editörünü kullanabilirsiniz:
+
+```bash
+docker pull ghcr.io/warpstreamlabs/bento:latest
+docker run -p 4195:4195 --rm ghcr.io/warpstreamlabs/bento blobl server --no-open --host 0.0.0.0
+```
+
+Ardından tarayıcıda `http://localhost:4195` adresini açarak:
+
+- Sol üstte: giriş belgesini yapıştırabilir,
+- Altta: Bloblang mapping’inizi yazabilir,
+- Sağ üstte: anlık olarak üretilen çıktıyı görebilirsiniz.
+
+
 

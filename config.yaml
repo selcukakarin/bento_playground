@@ -10,7 +10,7 @@ pipeline:
     - mapping: |
         root.about = "%s 🍱 is a %s %s".format(this.name.capitalize(), this.features.join(" & "), this.type.split("_").join(" "))
         root.stars = "★".repeat((this.stars / 300))
-
+    - sync_response: {}
 
 output:
   stdout: {}
