@@ -8,9 +8,9 @@ pipeline:
     - sleep:
         duration: 500ms
     - mapping: |
-        root.doc = this
-        root.first_name = this.names.index(0).uppercase()
-        root.last_name = this.names.index(-1).hash("sha256").encode("base64")
+        root.about = "%s 🍱 is a %s %s".format(this.name.capitalize(), this.features.join(" & "), this.type.split("_").join(" "))
+        root.stars = "★".repeat((this.stars / 300))
+
 
 output:
   stdout: {}
