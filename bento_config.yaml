@@ -1,0 +1,73 @@
+# bento_config.yaml
+
+# Kafka Input: Mesajları file_processing_queue'dan okur.
+input:
+  label: kafka_input
+  kafka:
+    addresses: [ "${KAFKA_BROKERS}" ] 
+    topics: [ "file_processing_queue" ] 
+    consumer_group: "${CONSUMER_GROUP}"
+    # Paralel işleme için limit (varsayılan 1024'tür) [11]
+    checkpoint_limit: 1024 
+    # İşleme hatası durumunda mesajların tekrar denenmesini sağlar (at-least-once garantisi) [11]
+    auto_replay_nacks: true 
+
+pipeline:
+  # İşlemcileri CPU çekirdek sayısına göre paralel çalıştırır (-1) [12]
+  threads: -1 
+  processors:
+    
+    # Adım 1: Gelen Kafka mesajını ayrıştır ve meta veriyi hazırla
+    - mapping: |
+        # Bloblang let keyword'ü ile geçici değişken tanımlama [13]
+        let file_id = this.Id.string()
+        
+        # PostgreSQL güncellemesi için Id'yi meta veriye kaydet [14]
+        meta file_id_for_sql = $file_id
+        
+        # FastAPI Worker'a gönderilecek nihai payload (root)
+        root = {
+            "Id": $file_id,
+            "Source": this.Source.string(),
+            "FileName": this.FileName.string(),
+            "FileType": this.FileType.string()
+        }
+    
+    # Adım 2: FastAPI Worker Service'e HTTP isteği gönderme (Dosya İşleme)
+    - label: process_worker_request
+      http:
+        url: "${WORKER_SERVICE_URL}" # Worker Servisi URL'i
+        verb: POST
+        headers:
+          Content-Type: application/json
+        timeout: 300s # İşleme uzun sürebileceği için uzun zaman aşımı [15]
+        retries: 3 
+        # 429 gibi hatalarda geri çekilerek tekrar dene [10]
+        backoff_on: [ 429 ] 
+        
+    # Adım 3: PostgreSQL'deki kaydı güncelleme (Sadece Worker başarılı olursa)
+    # switch processor, önceki adımdaki hatalara göre dallanmayı sağlar. [16], [17]
+    - switch: 
+      
+      - check: errored() # Hata oluştuysa
+        processors:
+          - log:
+              message: "PostgreSQL update skipped due to processing error: ${!error()}"
+              level: ERROR
+      
+      - check: "!errored()" # Hata oluşmadıysa
+        processors:
+          # SQL Raw İşlemcisi ile PostgreSQL güncellemesi
+          - sql_raw:
+              driver: postgres
+              data_source_name: |
+                host=${PG_HOST} port=${PG_PORT} user=${PG_USER} password=${PG_PASSWORD} dbname=${PG_DB} sslmode=disable
+              # SQL sorgusunda meta veriden Id'yi çekme [18], [19]
+              query: |
+                UPDATE "FilePath" 
+                SET "IsProcessed" = TRUE, "IndexedAt" = NOW()
+                WHERE "Id" = '${! metadata("file_id_for_sql") }';
+              
+# Çıktı: Başarılı mesajlar ACKlenir ve akıştan çıkarılır [20]
+output:
+  drop: {} 

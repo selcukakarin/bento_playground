@@ -1,0 +1,17 @@
+# Python Worker ve Document Utils için gerekli kütüphaneler
+
+# FastAPI ve HTTP sunucusu
+fastapi
+uvicorn[standard]
+requests
+
+# Qdrant İstemcisi
+qdrant-client
+
+# PostgreSQL için (Bento kullanmasa bile, Worker servisinde bir hata ayıklama aracı olarak bulunabilir)
+psycopg2-binary 
+
+# Dosya yükleme ve bölme (Chunking) kütüphaneleri
+langchain-core
+langchain-text-splitters
+markitdown # DocumentLoader tarafından kullanılan kütüphane [5], [6]

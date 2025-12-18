@@ -1,0 +1,55 @@
+version: '3.8'
+
+# .env dosyasındaki değişkenleri otomatik olarak yükler
+env_file:
+  - .env
+
+services:
+  
+  # 1. Dosya İşleme Worker Servisi (FastAPI)
+  worker-service:
+    build: .
+    container_name: worker_service
+    # Worker'ın çalıştığı portu dışarıya aç
+    ports:
+      - "8080:8080"
+    restart: on-failure
+    # Bento'nun ve Worker'ın Kafka/Postgres/Vector servisine erişimi için network ayarları
+    # Host ağına erişim için:
+    network_mode: "host" 
+    
+    environment:
+      # FastAPI uygulamasının doğrudan okuyacağı değişkenler (Worker'ın ENV'si)
+      QDRANT_URL: ${QDRANT_URL}
+      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME}
+      # Host makinedeki vektör servisine erişim, host network modunda localhost veya 
+      # host.docker.internal kullanılabilir. Host network kullanılıyorsa, 
+      # worker doğrudan host makineye erişir:
+      VECTOR_API_URL: http://localhost:5000/predictions 
+      # .NET uygulamasının adresi
+      NET_DOWNLOAD_ENDPOINT: ${NET_DOWNLOAD_ENDPOINT} 
+
+  # 2. Bento Veri Akışı Motoru
+  bento-pipeline:
+    image: ghcr.io/warpstreamlabs/bento:latest 
+    container_name: bento_processor
+    # Konfigürasyon dosyasını mount et
+    volumes:
+      - ./bento_config.yaml:/bento.yaml
+    # Host network modu, Kafka ve PostgreSQL'e kolay erişim sağlar
+    network_mode: "host" 
+    # Bento'yu konfigürasyon dosyası ile başlat
+    command: ["bento", "-c", "/bento.yaml"]
+    restart: on-failure
+    environment:
+      # Bento'nun konfigürasyonda kullanacağı tüm değişkenler
+      KAFKA_BROKERS: ${KAFKA_BROKERS}
+      # Worker servisine erişim (host network modunda 8080 portu)
+      WORKER_SERVICE_URL: ${WORKER_SERVICE_URL}
+      
+      # PostgreSQL bağlantı bilgileri (Sırlar) [21]
+      PG_HOST: ${PG_HOST}
+      PG_PORT: ${PG_PORT}
+      PG_USER: ${PG_USER}
+      PG_DB: ${PG_DB}
+      PG_PASSWORD: ${PG_PASSWORD} 
